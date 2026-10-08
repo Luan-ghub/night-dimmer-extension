@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Night Dimmer</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="panel">
+      <header class="header">
+        <div>
+          <p class="eyebrow">CONFORTO VISUAL</p>
+          <h1>Night Dimmer</h1>
+        </div>
+        <label class="switch" title="Ativar ou desativar todos os efeitos">
+          <input id="enabled" type="checkbox" aria-label="Ativar Night Dimmer" />
+          <span class="switch-track" aria-hidden="true"></span>
+        </label>
+      </header>
+
+      <section class="card" aria-labelledby="brightness-label">
+        <div class="control-heading">
+          <label id="brightness-label" for="brightness">Brilho da página</label>
+          <output id="brightness-value" for="brightness">70%</output>
+        </div>
+        <input id="brightness" type="range" min="10" max="100" value="70" />
+        <div class="range-labels" aria-hidden="true">
+          <span>Mais escuro</span>
+          <span>Original</span>
+        </div>
+
+        <div class="brightness-presets" aria-label="Atalhos de brilho">
+          <button type="button" data-brightness="25">25%</button>
+          <button type="button" data-brightness="50">50%</button>
+          <button type="button" data-brightness="70">70%</button>
+          <button type="button" data-brightness="100">100%</button>
+        </div>
+
+        <div class="profile-box">
+          <div class="profile-heading">
+            <div>
+              <p class="control-title">Perfil automático</p>
+              <p class="control-description">Usa sempre o valor salvo</p>
+            </div>
+            <label class="switch switch-small" title="Ativar perfil automático">
+              <input id="profile-enabled" type="checkbox" aria-label="Ativar perfil automático" />
+              <span class="switch-track" aria-hidden="true"></span>
+            </label>
+          </div>
+          <div class="profile-editor">
+            <label for="profile-brightness">Brilho salvo</label>
+            <div class="number-field">
+              <input id="profile-brightness" type="number" min="10" max="100" step="1" value="60" />
+              <span>%</span>
+            </div>
+            <button id="save-profile" type="button">Salvar perfil</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="card effect-card" aria-labelledby="comfort-title">
+        <div class="control-heading">
+          <div>
+            <p id="comfort-title" class="control-title">Filtro conforto</p>
+            <p class="control-description">Adiciona um tom quente à página</p>
+          </div>
+          <label class="switch switch-small" title="Ativar filtro conforto">
+            <input id="comfort-enabled" type="checkbox" aria-label="Ativar filtro conforto" />
+            <span class="switch-track" aria-hidden="true"></span>
+          </label>
+        </div>
+        <div class="control-heading subcontrol-heading">
+          <label for="comfort">Intensidade</label>
+          <output id="comfort-value" for="comfort">35%</output>
+        </div>
+        <input id="comfort" type="range" min="0" max="100" value="35" />
+        <div class="range-labels" aria-hidden="true">
+          <span>Suave</span>
+          <span>Mais quente</span>
+        </div>
+      </section>
+
+      <section class="card effect-card" aria-labelledby="dark-mode-title">
+        <div class="control-heading">
+          <div>
+            <div class="title-with-badge">
+              <p id="dark-mode-title" class="control-title">Modo escuro inteligente</p>
+              <span class="badge">EXPERIMENTAL</span>
+            </div>
+            <p class="control-description">Escurece superfícies e preserva mídias</p>
+          </div>
+          <label class="switch switch-small" title="Ativar modo escuro inteligente">
+            <input id="dark-mode-enabled" type="checkbox" aria-label="Ativar modo escuro inteligente" />
+            <span class="switch-track" aria-hidden="true"></span>
+          </label>
+        </div>
+        <label class="select-label" for="dark-mode-level">
+          Intensidade
+          <select id="dark-mode-level">
+            <option value="soft">Suave</option>
+            <option value="balanced" selected>Equilibrado</option>
+            <option value="intense">Intenso</option>
+          </select>
+        </label>
+      </section>
+
+      <fieldset class="card scope-card">
+        <legend>Aplicar em</legend>
+        <label class="radio-row">
+          <input type="radio" name="scope" value="current" />
+          <span>Somente nesta aba</span>
+        </label>
+        <label class="radio-row">
+          <input type="radio" name="scope" value="selected" />
+          <span>Abas selecionadas</span>
+        </label>
+        <label class="radio-row">
+          <input type="radio" name="scope" value="all" checked />
+          <span>Todas as abas</span>
+        </label>
+
+        <section id="tab-picker" class="tab-picker" aria-label="Seleção de abas" hidden>
+          <div class="tab-picker-header">
+            <div>
+              <strong>Guias abertas</strong>
+              <span id="tab-count" class="tab-count"></span>
+            </div>
+            <div class="picker-actions">
+              <button id="select-all-tabs" type="button">Todas</button>
+            </div>
+          </div>
+          <div id="tab-list" class="tab-list"></div>
+          <p class="resize-hint">Arraste a borda inferior para ajustar a altura.</p>
+        </section>
+      </fieldset>
+
+      <p id="status" class="status" role="status" aria-live="polite"></p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

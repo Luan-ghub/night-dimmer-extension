@@ -52,11 +52,41 @@ As configurações são armazenadas localmente pelo navegador. A extensão não 
 ## Como instalar
 
 1. No GitHub, selecione **Code > Download ZIP** e extraia o arquivo.
-2. Confirme que `manifest.json` está diretamente dentro da pasta extraída.
-3. Abra o gerenciamento de extensões do seu navegador.
-4. Ative o **Modo do desenvolvedor**, normalmente localizado na parte superior esquerda da aba.
+
+   <p align="center">
+     <img src="images/download.jpg" alt="Download do arquivo pelo GitHub" width="720">
+   </p>
+
+2. Confirme que o arquivo `manifest.json` está diretamente dentro da pasta extraída.
+
+   <p align="center">
+     <img src="images/manifest.jpg" alt="Localização do arquivo manifest.json" width="600">
+   </p>
+
+3. Abra o gerenciamento de extensões do navegador.
+
+   <p align="center">
+     <img src="images/gerenciamento.jpg" alt="Gerenciador de extensões do navegador" width="720">
+   </p>
+
+4. Ative o **Modo do desenvolvedor**, normalmente localizado na parte superior da página.
+
+   <p align="center">
+     <img src="images/desenvolvedor.jpg" alt="Ativação do modo do desenvolvedor" width="720">
+   </p>
+
 5. Clique em **Carregar sem compactação**.
-6. Selecione a pasta que contém o `manifest.json`.
+
+   <p align="center">
+     <img src="images/carregamento.jpg" alt="Opção para carregar a extensão" width="600">
+   </p>
+
+6. Selecione a pasta `night-dimmer` inteira, sem abri-la, e confirme o carregamento.
+
+   <p align="center">
+     <img src="images/selecao.jpg" alt="Seleção da pasta da extensão" width="600">
+   </p>
+
 
 Obs: 
 

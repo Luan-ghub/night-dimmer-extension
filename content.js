@@ -46,7 +46,9 @@
   const preparedRoots = new Set();
   const observers = [];
   let elementQueue = [];
+  let queuedElements = new WeakSet();
   let queueScheduled = false;
+  let processedSinceCleanup = 0;
   let darkModeEnabled = false;
   let darkModeLevel = "balanced";
   let generation = 0;
@@ -283,6 +285,26 @@
     }
   }
 
+  function removeDisconnectedReferences() {
+    for (const element of styledElements) {
+      if (!element.isConnected) {
+        styledElements.delete(element);
+      }
+    }
+
+    for (const style of injectedStyles) {
+      if (!style.isConnected) {
+        injectedStyles.delete(style);
+      }
+    }
+
+    for (const root of preparedRoots) {
+      if (root instanceof ShadowRoot && !root.host.isConnected) {
+        preparedRoots.delete(root);
+      }
+    }
+  }
+
   function scheduleQueue() {
     if (queueScheduled || !darkModeEnabled) {
       return;
@@ -305,8 +327,19 @@
         processed < 180 &&
         (!deadline || deadline.timeRemaining() > 1)
       ) {
-        processElement(elementQueue.pop(), palette);
+        const element = elementQueue.pop();
+        queuedElements.delete(element);
+
+        if (element.isConnected) {
+          processElement(element, palette);
+        }
         processed += 1;
+      }
+
+      processedSinceCleanup += processed;
+      if (processedSinceCleanup >= 1000) {
+        removeDisconnectedReferences();
+        processedSinceCleanup = 0;
       }
 
       if (elementQueue.length) {
@@ -321,19 +354,28 @@
     }
   }
 
+  function queueElement(element) {
+    if (queuedElements.has(element)) {
+      return;
+    }
+
+    queuedElements.add(element);
+    elementQueue.push(element);
+  }
+
   function queueSubtree(node) {
     if (!(node instanceof Element) && !(node instanceof ShadowRoot)) {
       return;
     }
 
     if (node instanceof Element) {
-      elementQueue.push(node);
+      queueElement(node);
     }
 
     const walker = document.createTreeWalker(node, NodeFilter.SHOW_ELEMENT);
     let current;
     while ((current = walker.nextNode())) {
-      elementQueue.push(current);
+      queueElement(current);
     }
 
     scheduleQueue();
@@ -369,7 +411,9 @@
     generation += 1;
     darkModeEnabled = false;
     elementQueue = [];
+    queuedElements = new WeakSet();
     queueScheduled = false;
+    processedSinceCleanup = 0;
 
     for (const observer of observers.splice(0)) {
       observer.disconnect();

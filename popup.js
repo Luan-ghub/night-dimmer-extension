@@ -96,6 +96,19 @@ function selectedTabIds() {
     .filter(Number.isInteger);
 }
 
+function selectedTabsAcrossWindows() {
+  const visibleTabIds = new Set(
+    [...elements.tabList.querySelectorAll('input[type="checkbox"]')]
+      .map((checkbox) => Number(checkbox.value))
+      .filter(Number.isInteger),
+  );
+  const selectedInOtherWindows = currentState.selectedTabIds.filter(
+    (tabId) => !visibleTabIds.has(tabId),
+  );
+
+  return [...new Set([...selectedInOtherWindows, ...selectedTabIds()])];
+}
+
 function updateTabCount() {
   const selected = selectedTabIds().length;
   const available = elements.tabList.querySelectorAll(
@@ -188,7 +201,9 @@ function collectState() {
   if (scope === "current" && Number.isInteger(activeTabId)) {
     tabIds = [activeTabId];
   } else if (scope === "selected") {
-    tabIds = selectedTabIds();
+    tabIds = selectedTabsAcrossWindows();
+  } else {
+    tabIds = currentState.selectedTabIds;
   }
 
   return {
@@ -405,7 +420,16 @@ elements.selectAllTabs.addEventListener("click", () => {
 void (async () => {
   try {
     await loadTabs();
-    renderState(await chrome.storage.local.get(DEFAULT_STATE));
+    const savedState = await chrome.storage.local.get(DEFAULT_STATE);
+    renderState(savedState);
+
+    if (
+      savedState.scope === "current" &&
+      Number.isInteger(activeTabId) &&
+      !savedState.selectedTabIds.includes(activeTabId)
+    ) {
+      await applyState();
+    }
   } catch (error) {
     console.error("Night Dimmer: falha ao iniciar o popup.", error);
     renderState(DEFAULT_STATE);

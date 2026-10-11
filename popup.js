@@ -281,7 +281,7 @@ function createTabRow(tab) {
   image.addEventListener("error", () => image.remove());
   if (
     tab.favIconUrl &&
-    /^(data:image\/|https?:|chrome:|brave:|edge:)/i.test(tab.favIconUrl)
+    /^(data:image\/|https:)/i.test(tab.favIconUrl)
   ) {
     image.src = tab.favIconUrl;
   }

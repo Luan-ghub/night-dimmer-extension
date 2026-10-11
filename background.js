@@ -136,7 +136,14 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type === "NIGHT_DIMMER_GET_SETTINGS") {
+  if (sender.id !== chrome.runtime.id) {
+    return false;
+  }
+
+  if (
+    message?.type === "NIGHT_DIMMER_GET_SETTINGS" &&
+    Number.isInteger(sender.tab?.id)
+  ) {
     void (async () => {
       try {
         const state = await getState();
@@ -151,7 +158,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message?.type === "NIGHT_DIMMER_APPLY_STATE") {
+  if (
+    message?.type === "NIGHT_DIMMER_APPLY_STATE" &&
+    !sender.tab &&
+    sender.url === chrome.runtime.getURL("popup.html")
+  ) {
     void (async () => {
       try {
         const state = normalizeState(message.state);

@@ -460,8 +460,11 @@
     setDarkMode(enabled && settings.darkModeEnabled, settings.darkModeLevel);
   }
 
-  chrome.runtime.onMessage.addListener((message) => {
-    if (message?.type === "NIGHT_DIMMER_EFFECTIVE_SETTINGS") {
+  chrome.runtime.onMessage.addListener((message, sender) => {
+    if (
+      sender.id === chrome.runtime.id &&
+      message?.type === "NIGHT_DIMMER_EFFECTIVE_SETTINGS"
+    ) {
       applySettings(message.settings);
     }
   });

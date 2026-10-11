@@ -110,7 +110,7 @@ async function broadcastState(state) {
   const tabs = await chrome.tabs.query({});
   const results = await Promise.all(
     tabs
-      .filter((tab) => Number.isInteger(tab.id))
+      .filter((tab) => Number.isInteger(tab.id) && !tab.discarded)
       .map(async (tab) => {
         const settings = settingsForTab(state, tab.id);
         return {

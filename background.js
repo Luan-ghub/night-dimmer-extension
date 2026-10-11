@@ -55,16 +55,33 @@ function normalizeState(state = {}) {
   };
 }
 
-function settingsForTab(state, tabId) {
+function normalizeTabBrightness(values = {}) {
+  if (!values || typeof values !== "object" || Array.isArray(values)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(values)
+      .filter(([tabId]) => Number.isInteger(Number(tabId)))
+      .map(([tabId, brightness]) => [
+        tabId,
+        clamp(brightness, 10, 100, DEFAULT_STATE.brightness),
+      ]),
+  );
+}
+
+function settingsForTab(state, tabId, tabBrightness = {}) {
   const tabIsSelected =
     state.scope === "all" || state.selectedTabIds.includes(tabId);
   const enabled = state.enabled && tabIsSelected;
+  const individualBrightness =
+    state.scope === "selected" ? tabBrightness[String(tabId)] : undefined;
 
   return {
     enabled,
-    brightness: state.profileEnabled
-      ? state.profileBrightness
-      : state.brightness,
+    brightness:
+      individualBrightness ??
+      (state.profileEnabled ? state.profileBrightness : state.brightness),
     comfortEnabled: enabled && state.comfortEnabled,
     comfort: state.comfort,
     darkModeEnabled: enabled && state.darkModeEnabled,
@@ -74,6 +91,12 @@ function settingsForTab(state, tabId) {
 
 async function getState() {
   return normalizeState(await chrome.storage.local.get(DEFAULT_STATE));
+}
+
+async function getTabBrightness() {
+  const { tabBrightness = {} } =
+    await chrome.storage.session.get("tabBrightness");
+  return normalizeTabBrightness(tabBrightness);
 }
 
 async function sendToTab(tabId, settings) {
@@ -106,13 +129,13 @@ async function sendToTab(tabId, settings) {
   }
 }
 
-async function broadcastState(state) {
+async function broadcastState(state, tabBrightness) {
   const tabs = await chrome.tabs.query({});
   const results = await Promise.all(
     tabs
       .filter((tab) => Number.isInteger(tab.id) && !tab.discarded)
       .map(async (tab) => {
-        const settings = settingsForTab(state, tab.id);
+        const settings = settingsForTab(state, tab.id, tabBrightness);
         return {
           targeted: settings.enabled,
           delivered: await sendToTab(tab.id, settings),
@@ -146,10 +169,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   ) {
     void (async () => {
       try {
-        const state = await getState();
+        const [state, tabBrightness] = await Promise.all([
+          getState(),
+          getTabBrightness(),
+        ]);
         sendResponse({
           ok: true,
-          settings: settingsForTab(state, sender.tab?.id),
+          settings: settingsForTab(state, sender.tab?.id, tabBrightness),
         });
       } catch (error) {
         sendResponse({ ok: false });
@@ -166,8 +192,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     void (async () => {
       try {
         const state = normalizeState(message.state);
-        await chrome.storage.local.set(state);
-        const result = await broadcastState(state);
+        const tabBrightness = normalizeTabBrightness(
+          message.state?.tabBrightness,
+        );
+        await Promise.all([
+          chrome.storage.local.set(state),
+          chrome.storage.session.set({ tabBrightness }),
+        ]);
+        const result = await broadcastState(state, tabBrightness);
         sendResponse({ ok: true, ...result });
       } catch (error) {
         console.error("Night Dimmer: falha ao aplicar as configurações.", error);
@@ -182,13 +214,23 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 chrome.tabs.onRemoved.addListener((tabId) => {
   void (async () => {
-    const state = await getState();
+    const [state, tabBrightness] = await Promise.all([
+      getState(),
+      getTabBrightness(),
+    ]);
+    const brightnessKey = String(tabId);
+    const tabWasSelected = state.selectedTabIds.includes(tabId);
+    const tabHadCustomBrightness = brightnessKey in tabBrightness;
 
-    if (!state.selectedTabIds.includes(tabId)) {
+    if (!tabWasSelected && !tabHadCustomBrightness) {
       return;
     }
 
     state.selectedTabIds = state.selectedTabIds.filter((id) => id !== tabId);
-    await chrome.storage.local.set(state);
+    delete tabBrightness[brightnessKey];
+    await Promise.all([
+      chrome.storage.local.set(state),
+      chrome.storage.session.set({ tabBrightness }),
+    ]);
   })();
 });

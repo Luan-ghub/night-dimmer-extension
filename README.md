@@ -35,10 +35,11 @@ O recurso é reversível e oferece três intensidades: **Suave**, **Equilibrado*
 
 - **Somente nesta aba:** aplica na aba ativa no momento da configuração.
 - **Abas selecionadas:** mostra as guias da janela atual com favicon, título,
-  domínio e último acesso.
+  domínio, último acesso e controle individual de brilho.
 - **Todas as abas:** aplica em abas compatíveis de todas as janelas.
 
 A lista de abas pode ser expandida verticalmente arrastando sua borda inferior.
+Os ajustes individuais de brilho permanecem durante a sessão atual do navegador.
 
 ## Privacidade e permissões
 
@@ -100,7 +101,11 @@ Obs:
 
 - Elementos exibidos em tela cheia pelo próprio site podem ocultar temporariamente os filtros da extensão.
 
-## Atualização 3.0.2
+## Atualização 3.1.0
+
+- controle individual de brilho para cada aba selecionada.
+
+### Atualização 3.0.2
 
 - reforço da validação das mensagens internas;
 - correção da seleção de abas entre diferentes janelas;

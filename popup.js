@@ -9,6 +9,7 @@ const DEFAULT_STATE = {
   darkModeLevel: "balanced",
   scope: "current",
   selectedTabIds: [],
+  tabBrightness: {},
 };
 
 const elements = {
@@ -102,11 +103,63 @@ function selectedTabsAcrossWindows() {
       .map((checkbox) => Number(checkbox.value))
       .filter(Number.isInteger),
   );
-  const selectedInOtherWindows = currentState.selectedTabIds.filter(
+  const savedTabIds = Array.isArray(currentState.selectedTabIds)
+    ? currentState.selectedTabIds
+    : [];
+  const selectedInOtherWindows = savedTabIds.filter(
     (tabId) => !visibleTabIds.has(tabId),
   );
 
   return [...new Set([...selectedInOtherWindows, ...selectedTabIds()])];
+}
+
+function normalizeTabBrightness(values = {}) {
+  if (!values || typeof values !== "object" || Array.isArray(values)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(values)
+      .filter(([tabId]) => Number.isInteger(Number(tabId)))
+      .map(([tabId, brightness]) => [
+        tabId,
+        clamp(brightness, 10, 100, DEFAULT_STATE.brightness),
+      ]),
+  );
+}
+
+function currentGlobalBrightness() {
+  return elements.profileEnabled.checked
+    ? clamp(
+        elements.profileBrightness.value,
+        10,
+        100,
+        DEFAULT_STATE.profileBrightness,
+      )
+    : clamp(
+        elements.brightness.value,
+        10,
+        100,
+        DEFAULT_STATE.brightness,
+      );
+}
+
+function updateTabBrightnessDisplay(slider, value) {
+  const brightness = clamp(value, 10, 100, currentGlobalBrightness());
+  slider.value = String(brightness);
+  slider.parentElement.querySelector(".tab-brightness-value").textContent =
+    `${brightness}%`;
+}
+
+function renderTabBrightness() {
+  const fallback = currentGlobalBrightness();
+
+  for (const slider of elements.tabList.querySelectorAll(
+    ".tab-brightness-range",
+  )) {
+    const savedValue = currentState.tabBrightness[slider.dataset.tabId];
+    updateTabBrightnessDisplay(slider, savedValue ?? fallback);
+  }
 }
 
 function updateTabCount() {
@@ -131,6 +184,16 @@ function updateDisabledState() {
   for (const preset of elements.brightnessPresets) {
     preset.disabled = !enabled;
   }
+
+  for (const slider of elements.tabList.querySelectorAll(
+    ".tab-brightness-range",
+  )) {
+    const checkbox = slider.closest(".tab-row").querySelector(
+      'input[type="checkbox"]',
+    );
+    slider.disabled = !enabled || checkbox.disabled || !checkbox.checked;
+    slider.parentElement.classList.toggle("disabled", slider.disabled);
+  }
 }
 
 function updateBrightnessDisplay(value) {
@@ -144,6 +207,10 @@ function updateBrightnessDisplay(value) {
       Number(preset.dataset.brightness) === brightness,
     );
   }
+
+  if (currentState.tabBrightness) {
+    renderTabBrightness();
+  }
 }
 
 function updateScopeVisibility() {
@@ -151,44 +218,54 @@ function updateScopeVisibility() {
 }
 
 function renderState(state) {
+  const selectedTabIds = Array.isArray(state.selectedTabIds)
+    ? state.selectedTabIds
+    : [];
   currentState = {
     ...DEFAULT_STATE,
     ...state,
+    selectedTabIds,
+    tabBrightness: normalizeTabBrightness(state.tabBrightness),
   };
-  elements.enabled.checked = state.enabled !== false;
-  elements.profileEnabled.checked = state.profileEnabled === true;
+  elements.enabled.checked = currentState.enabled !== false;
+  elements.profileEnabled.checked = currentState.profileEnabled === true;
   elements.profileBrightness.value = String(
     clamp(
-      state.profileBrightness,
+      currentState.profileBrightness,
       10,
       100,
       DEFAULT_STATE.profileBrightness,
     ),
   );
   updateBrightnessDisplay(
-    state.profileEnabled ? state.profileBrightness : state.brightness,
+    currentState.profileEnabled
+      ? currentState.profileBrightness
+      : currentState.brightness,
   );
-  elements.comfortEnabled.checked = state.comfortEnabled === true;
+  elements.comfortEnabled.checked = currentState.comfortEnabled === true;
   elements.comfort.value = String(
-    clamp(state.comfort, 0, 100, DEFAULT_STATE.comfort),
+    clamp(currentState.comfort, 0, 100, DEFAULT_STATE.comfort),
   );
   elements.comfortValue.value = `${elements.comfort.value}%`;
-  elements.darkModeEnabled.checked = state.darkModeEnabled === true;
+  elements.darkModeEnabled.checked = currentState.darkModeEnabled === true;
   elements.darkModeLevel.value = ["soft", "balanced", "intense"].includes(
-    state.darkModeLevel,
+    currentState.darkModeLevel,
   )
-    ? state.darkModeLevel
+    ? currentState.darkModeLevel
     : DEFAULT_STATE.darkModeLevel;
 
-  const scopeRadio = elements.scopes.find((radio) => radio.value === state.scope);
+  const scopeRadio = elements.scopes.find(
+    (radio) => radio.value === currentState.scope,
+  );
   (scopeRadio || elements.scopes.at(-1)).checked = true;
 
   for (const checkbox of elements.tabList.querySelectorAll(
     'input[type="checkbox"]',
   )) {
-    checkbox.checked = state.selectedTabIds?.includes(Number(checkbox.value));
+    checkbox.checked = selectedTabIds.includes(Number(checkbox.value));
   }
 
+  renderTabBrightness();
   updateDisabledState();
   updateScopeVisibility();
   updateTabCount();
@@ -224,6 +301,7 @@ function collectState() {
     darkModeLevel: elements.darkModeLevel.value,
     scope,
     selectedTabIds: tabIds,
+    tabBrightness: { ...currentState.tabBrightness },
   };
 }
 
@@ -266,7 +344,8 @@ function scheduleApply() {
 
 function createTabRow(tab) {
   const protectedTab = isProtectedUrl(tab.url);
-  const label = document.createElement("label");
+  const row = document.createElement("div");
+  const tabLabel = document.createElement("label");
   const checkbox = document.createElement("input");
   const thumbnail = document.createElement("span");
   const image = document.createElement("img");
@@ -274,16 +353,20 @@ function createTabRow(tab) {
   const copy = document.createElement("span");
   const title = document.createElement("strong");
   const meta = document.createElement("span");
+  const brightnessControl = document.createElement("div");
+  const brightness = document.createElement("input");
+  const brightnessValue = document.createElement("span");
   const domain = hostnameFromUrl(tab.url);
   const recency = formatLastAccessed(tab.lastAccessed);
 
-  label.className = [
+  row.className = [
     "tab-row",
     protectedTab ? "protected" : "",
     tab.active ? "current" : "",
   ]
     .filter(Boolean)
     .join(" ");
+  tabLabel.className = "tab-main";
   checkbox.type = "checkbox";
   checkbox.value = String(tab.id);
   checkbox.disabled = protectedTab;
@@ -310,12 +393,52 @@ function createTabRow(tab) {
   meta.textContent = [domain, recency].filter(Boolean).join(" · ");
   copy.append(title, meta);
 
+  brightnessControl.className = "tab-brightness";
+  brightness.type = "range";
+  brightness.className = "tab-brightness-range";
+  brightness.min = "10";
+  brightness.max = "100";
+  brightness.step = "1";
+  brightness.value = String(DEFAULT_STATE.brightness);
+  brightness.dataset.tabId = String(tab.id);
+  brightness.setAttribute(
+    "aria-label",
+    `Brilho individual da aba ${tab.title || domain || tab.id}`,
+  );
+  brightnessValue.className = "tab-brightness-value";
+  brightnessValue.textContent = `${DEFAULT_STATE.brightness}%`;
+  brightnessControl.append(brightness, brightnessValue);
+
   checkbox.addEventListener("change", () => {
     updateTabCount();
+    updateDisabledState();
     scheduleApply();
   });
-  label.append(checkbox, thumbnail, copy);
-  return label;
+  brightness.addEventListener("input", () => {
+    const value = clamp(
+      brightness.value,
+      10,
+      100,
+      currentGlobalBrightness(),
+    );
+    const tabId = String(tab.id);
+
+    updateTabBrightnessDisplay(brightness, value);
+    if (value === currentGlobalBrightness()) {
+      delete currentState.tabBrightness[tabId];
+    } else {
+      currentState.tabBrightness[tabId] = value;
+    }
+    scheduleApply();
+  });
+  brightness.addEventListener("change", () => {
+    clearTimeout(saveTimer);
+    applyState();
+  });
+
+  tabLabel.append(checkbox, thumbnail, copy);
+  row.append(tabLabel, brightnessControl);
+  return row;
 }
 
 async function loadTabs() {
@@ -414,19 +537,26 @@ elements.selectAllTabs.addEventListener("click", () => {
     checkbox.checked = shouldSelect;
   }
   updateTabCount();
+  updateDisabledState();
   applyState();
 });
 
 void (async () => {
   try {
     await loadTabs();
-    const savedState = await chrome.storage.local.get(DEFAULT_STATE);
-    renderState(savedState);
+    const [savedState, sessionState] = await Promise.all([
+      chrome.storage.local.get(DEFAULT_STATE),
+      chrome.storage.session.get("tabBrightness"),
+    ]);
+    renderState({
+      ...savedState,
+      tabBrightness: sessionState.tabBrightness,
+    });
 
     if (
-      savedState.scope === "current" &&
+      currentState.scope === "current" &&
       Number.isInteger(activeTabId) &&
-      !savedState.selectedTabIds.includes(activeTabId)
+      !currentState.selectedTabIds.includes(activeTabId)
     ) {
       await applyState();
     }

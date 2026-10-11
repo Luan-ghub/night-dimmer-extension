@@ -1,7 +1,6 @@
 # Night Dimmer
 
-Extensão Chromium Manifest V3 para controle de brilho, filtro de conforto, perfil automático e modo escuro inteligente aplicados em abas do navegador. Os recursos podem ser aplicados em uma
-aba, em abas selecionadas ou em todas as abas.
+Extensão Chromium Manifest V3 para controle de brilho, filtro de conforto, perfil automático e modo escuro inteligente aplicados em abas do navegador. Os recursos podem ser aplicados em uma aba, em abas selecionadas ou em todas as abas.
 
 ## Apoie o projeto
 
@@ -95,9 +94,18 @@ Obs:
 
 ## Limitações
 
-- Navegadores Chromium não permitem alterações em páginas internas (`brave://...`, `chrome://...`, `edge://...`), lojas de extensões e a lguns visualizadores protegidos.
+- Navegadores Chromium não permitem alterações em páginas internas (`brave://...`, `chrome://...`, `edge://...`), lojas de extensões e alguns visualizadores protegidos.
 
--  O modo escuro inteligente pode produzir resultados imperfeitos em algumas páginas. O ajuste de brilho e de conforto ocular permanecem mesmo que ele seja desativado
+- O modo escuro inteligente pode produzir resultados imperfeitos em algumas páginas. O ajuste de brilho e de conforto ocular permanece mesmo que ele seja desativado.
+
+- Elementos exibidos em tela cheia pelo próprio site podem ocultar temporariamente os filtros da extensão.
+
+## Atualização 3.0.2
+
+- reforço da validação das mensagens internas;
+- correção da seleção de abas entre diferentes janelas;
+- redução de sincronizações e processamentos repetidos;
+- início desativado e limitado à aba atual em novas instalações.
 
 ## Estrutura do projeto
 

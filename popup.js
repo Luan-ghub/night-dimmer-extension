@@ -1,5 +1,5 @@
 const DEFAULT_STATE = {
-  enabled: true,
+  enabled: false,
   brightness: 70,
   profileEnabled: false,
   profileBrightness: 60,
@@ -7,7 +7,7 @@ const DEFAULT_STATE = {
   comfort: 35,
   darkModeEnabled: false,
   darkModeLevel: "balanced",
-  scope: "all",
+  scope: "current",
   selectedTabIds: [],
 };
 

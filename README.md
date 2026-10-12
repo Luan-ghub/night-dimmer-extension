@@ -1,3 +1,5 @@
+![Capa do Night Dimmer](images/header.png)
+
 # Night Dimmer
 
 Extensão Chromium Manifest V3 para controle de brilho, filtro de conforto, perfil automático e modo escuro inteligente aplicados em abas do navegador. Os recursos podem ser aplicados em uma aba, em abas selecionadas ou em todas as abas.

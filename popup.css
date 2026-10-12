@@ -147,23 +147,6 @@ legend,
   margin-top: 14px;
 }
 
-.title-with-badge {
-  display: flex;
-  gap: 7px;
-  align-items: center;
-}
-
-.badge {
-  padding: 2px 5px;
-  border: 1px solid #4f467d;
-  border-radius: 4px;
-  color: #b7adff;
-  background: #27223f;
-  font-size: 7px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-}
-
 output {
   min-width: 43px;
   padding: 3px 7px;

@@ -273,14 +273,12 @@ function renderState(state) {
 
 function collectState() {
   const scope = selectedScope();
-  let tabIds = [];
+  let tabIds = Array.isArray(currentState.selectedTabIds)
+    ? currentState.selectedTabIds
+    : [];
 
-  if (scope === "current" && Number.isInteger(activeTabId)) {
-    tabIds = [activeTabId];
-  } else if (scope === "selected") {
+  if (scope === "selected") {
     tabIds = selectedTabsAcrossWindows();
-  } else {
-    tabIds = currentState.selectedTabIds;
   }
 
   return {
@@ -318,6 +316,7 @@ async function applyState() {
     const response = await chrome.runtime.sendMessage({
       type: "NIGHT_DIMMER_APPLY_STATE",
       state,
+      activeTabId,
     });
 
     if (!response?.ok) {
@@ -544,22 +543,22 @@ elements.selectAllTabs.addEventListener("click", () => {
 void (async () => {
   try {
     await loadTabs();
-    const [savedState, sessionState] = await Promise.all([
-      chrome.storage.local.get(DEFAULT_STATE),
-      chrome.storage.session.get("tabBrightness"),
-    ]);
-    renderState({
-      ...savedState,
-      tabBrightness: sessionState.tabBrightness,
+    const visibleTabIds = [
+      ...elements.tabList.querySelectorAll('input[type="checkbox"]'),
+    ]
+      .map((checkbox) => Number(checkbox.value))
+      .filter(Number.isInteger);
+    const response = await chrome.runtime.sendMessage({
+      type: "NIGHT_DIMMER_GET_POPUP_STATE",
+      activeTabId,
+      visibleTabIds,
     });
 
-    if (
-      currentState.scope === "current" &&
-      Number.isInteger(activeTabId) &&
-      !currentState.selectedTabIds.includes(activeTabId)
-    ) {
-      await applyState();
+    if (!response?.ok) {
+      throw new Error("O serviço da extensão não respondeu.");
     }
+
+    renderState(response.state);
   } catch (error) {
     console.error("Night Dimmer: falha ao iniciar o popup.", error);
     renderState(DEFAULT_STATE);

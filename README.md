@@ -41,11 +41,14 @@ O recurso é reversível e oferece três intensidades: **Suave**, **Equilibrado*
 - **Todas as abas:** aplica em abas compatíveis de todas as janelas.
 
 A lista de abas pode ser expandida verticalmente arrastando sua borda inferior.
-Os ajustes individuais de brilho permanecem durante a sessão atual do navegador.
+Cada guia mantém sua própria configuração durante a sessão. As preferências também
+são salvas por site e reaplicadas quando ele é aberto novamente.
 
 ## Privacidade e permissões
 
-As configurações são armazenadas localmente pelo navegador. A extensão não envia dados para serviços externos e não coleta o histórico de navegação.
+As configurações são armazenadas localmente pelo navegador. A extensão associa as
+preferências ao endereço de origem do site, sem salvar conteúdo das páginas. Ela não
+envia dados para serviços externos e não coleta o histórico de navegação.
 
 - `storage`: salva as preferências de brilho e conforto visual;
 - `tabs`: permite selecionar em quais abas os efeitos serão aplicados;
@@ -103,7 +106,13 @@ Obs:
 
 - Elementos exibidos em tela cheia pelo próprio site podem ocultar temporariamente os filtros da extensão.
 
-## Atualização 3.1.0
+## Atualização 3.2.0
+
+- configurações independentes para cada aba;
+- aplicação automática ao alternar ou recarregar guias;
+- recuperação das preferências salvas ao reabrir um site.
+
+### Atualização 3.1.0
 
 - controle individual de brilho para cada aba selecionada.
 

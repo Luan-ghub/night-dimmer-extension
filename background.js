@@ -14,6 +14,12 @@ const DEFAULT_UI_STATE = {
   selectedTabIds: [],
 };
 
+function normalizeTabIds(values = []) {
+  return Array.isArray(values)
+    ? [...new Set(values.filter(Number.isInteger))]
+    : [];
+}
+
 function clamp(value, minimum, maximum, fallback) {
   const number = Number(value);
   return Number.isFinite(number)
@@ -65,9 +71,7 @@ function normalizeUiState(state = {}) {
 
   return {
     scope: validScopes.has(state.scope) ? state.scope : DEFAULT_UI_STATE.scope,
-    selectedTabIds: Array.isArray(state.selectedTabIds)
-      ? [...new Set(state.selectedTabIds.filter(Number.isInteger))]
-      : [],
+    selectedTabIds: normalizeTabIds(state.selectedTabIds),
   };
 }
 
@@ -86,27 +90,17 @@ function normalizeTabBrightness(values = {}) {
   );
 }
 
-function siteKeyFromUrl(url = "") {
+function pageKeyFromUrl(url = "") {
   try {
     const parsedUrl = new URL(url);
-    return ["http:", "https:"].includes(parsedUrl.protocol)
-      ? parsedUrl.origin
-      : null;
+    if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+      return null;
+    }
+    parsedUrl.hash = "";
+    return parsedUrl.href;
   } catch (error) {
     return null;
   }
-}
-
-function normalizeSiteProfiles(values = {}) {
-  if (!values || typeof values !== "object" || Array.isArray(values)) {
-    return {};
-  }
-
-  return Object.fromEntries(
-    Object.entries(values)
-      .filter(([siteKey]) => siteKeyFromUrl(siteKey) === siteKey)
-      .map(([siteKey, profile]) => [siteKey, normalizeProfile(profile)]),
-  );
 }
 
 function normalizeTabProfiles(values = {}) {
@@ -121,13 +115,14 @@ function normalizeTabProfiles(values = {}) {
           Number.isInteger(Number(tabId)) &&
           record &&
           typeof record === "object" &&
-          siteKeyFromUrl(record.siteKey) === record.siteKey
+          typeof record.pageKey === "string" &&
+          pageKeyFromUrl(record.pageKey) === record.pageKey
         );
       })
       .map(([tabId, record]) => [
         tabId,
         {
-          siteKey: record.siteKey,
+          pageKey: record.pageKey,
           profile: normalizeProfile(record.profile),
         },
       ]),
@@ -150,39 +145,48 @@ function settingsForContent(profile) {
   };
 }
 
-async function getSiteProfiles() {
-  const { siteProfiles = {} } =
-    await chrome.storage.local.get("siteProfiles");
-  return normalizeSiteProfiles(siteProfiles);
-}
-
 async function getSessionState() {
   const stored = await chrome.storage.session.get({
     tabProfiles: {},
     uiState: DEFAULT_UI_STATE,
+    allTabsProfile: null,
+    appliedTabIds: [],
   });
 
   return {
     tabProfiles: normalizeTabProfiles(stored.tabProfiles),
     uiState: normalizeUiState(stored.uiState),
+    allTabsProfile: stored.allTabsProfile
+      ? normalizeProfile(stored.allTabsProfile)
+      : null,
+    appliedTabIds: normalizeTabIds(stored.appliedTabIds),
   };
 }
 
-function resolveProfile(tab, tabProfiles, siteProfiles) {
+function resolveProfile(
+  tab,
+  tabProfiles,
+  uiState = DEFAULT_UI_STATE,
+  allTabsProfile = null,
+) {
   const tabId = String(tab?.id);
-  const siteKey = siteKeyFromUrl(tab?.url);
+  const pageKey = pageKeyFromUrl(tab?.url);
   const tabRecord = tabProfiles[tabId];
 
-  if (siteKey && tabRecord?.siteKey === siteKey) {
-    return { siteKey, profile: tabRecord.profile, source: "tab" };
+  if (normalizeUiState(uiState).scope === "all" && allTabsProfile) {
+    return {
+      pageKey,
+      profile: normalizeProfile(allTabsProfile),
+      source: "all",
+    };
   }
 
-  if (siteKey && siteProfiles[siteKey]) {
-    return { siteKey, profile: siteProfiles[siteKey], source: "site" };
+  if (pageKey && tabRecord?.pageKey === pageKey) {
+    return { pageKey, profile: tabRecord.profile, source: "tab" };
   }
 
   return {
-    siteKey,
+    pageKey,
     profile: { ...DEFAULT_PROFILE },
     source: "default",
   };
@@ -220,36 +224,45 @@ async function sendToTab(tabId, settings) {
 
 async function applyStoredProfileToTab(tabId) {
   try {
-    const [tab, siteProfiles, sessionState] = await Promise.all([
+    const [tab, sessionState] = await Promise.all([
       chrome.tabs.get(tabId),
-      getSiteProfiles(),
       getSessionState(),
     ]);
     const resolved = resolveProfile(
       tab,
       sessionState.tabProfiles,
-      siteProfiles,
+      sessionState.uiState,
+      sessionState.allTabsProfile,
     );
     const tabKey = String(tabId);
     let sessionChanged = false;
 
-    if (resolved.source === "site") {
+    if (resolved.source === "all" && resolved.pageKey) {
       sessionState.tabProfiles[tabKey] = {
-        siteKey: resolved.siteKey,
+        pageKey: resolved.pageKey,
         profile: resolved.profile,
       };
+      if (!sessionState.appliedTabIds.includes(tabId)) {
+        sessionState.appliedTabIds.push(tabId);
+      }
       sessionChanged = true;
-    } else if (
-      resolved.source === "default" &&
-      sessionState.tabProfiles[tabKey]
-    ) {
-      delete sessionState.tabProfiles[tabKey];
-      sessionChanged = true;
+    } else if (resolved.source === "default") {
+      if (sessionState.tabProfiles[tabKey]) {
+        delete sessionState.tabProfiles[tabKey];
+        sessionChanged = true;
+      }
+      if (sessionState.appliedTabIds.includes(tabId)) {
+        sessionState.appliedTabIds = sessionState.appliedTabIds.filter(
+          (appliedTabId) => appliedTabId !== tabId,
+        );
+        sessionChanged = true;
+      }
     }
 
     if (sessionChanged) {
       await chrome.storage.session.set({
         tabProfiles: sessionState.tabProfiles,
+        appliedTabIds: sessionState.appliedTabIds,
       });
     }
     await sendToTab(tabId, settingsForContent(resolved.profile));
@@ -259,9 +272,8 @@ async function applyStoredProfileToTab(tabId) {
 }
 
 async function popupState(activeTabId, visibleTabIds = []) {
-  const [tabs, siteProfiles, sessionState] = await Promise.all([
+  const [tabs, sessionState] = await Promise.all([
     chrome.tabs.query({}),
-    getSiteProfiles(),
     getSessionState(),
   ]);
   const tabsById = new Map(
@@ -271,7 +283,12 @@ async function popupState(activeTabId, visibleTabIds = []) {
   );
   const activeTab = tabsById.get(activeTabId);
   const activeProfile = activeTab
-    ? resolveProfile(activeTab, sessionState.tabProfiles, siteProfiles).profile
+    ? resolveProfile(
+        activeTab,
+        sessionState.tabProfiles,
+        sessionState.uiState,
+        sessionState.allTabsProfile,
+      ).profile
     : DEFAULT_PROFILE;
   const activeBrightness = settingsForContent(activeProfile).brightness;
   const tabBrightness = {};
@@ -285,7 +302,8 @@ async function popupState(activeTabId, visibleTabIds = []) {
     const resolved = resolveProfile(
       tab,
       sessionState.tabProfiles,
-      siteProfiles,
+      sessionState.uiState,
+      sessionState.allTabsProfile,
     );
     const brightness = settingsForContent(resolved.profile).brightness;
     if (resolved.source !== "default" && brightness !== activeBrightness) {
@@ -327,14 +345,19 @@ async function applyPopupState(message) {
     message.activeTabId,
     uiState.selectedTabIds,
   );
-  const [siteProfiles, sessionState] = await Promise.all([
-    getSiteProfiles(),
-    getSessionState(),
-  ]);
+  const sessionState = await getSessionState();
   const applications = [];
+  const nextAppliedTabIds = tabs.map((tab) => tab.id);
+  const removedTabIds = sessionState.appliedTabIds.filter(
+    (tabId) => !nextAppliedTabIds.includes(tabId),
+  );
+
+  for (const tabId of removedTabIds) {
+    delete sessionState.tabProfiles[String(tabId)];
+  }
 
   for (const tab of tabs) {
-    const siteKey = siteKeyFromUrl(tab.url);
+    const pageKey = pageKeyFromUrl(tab.url);
     let tabProfile = { ...profile };
     const individualBrightness = tabBrightness[String(tab.id)];
 
@@ -346,24 +369,27 @@ async function applyPopupState(message) {
       };
     }
 
-    if (siteKey) {
+    if (pageKey) {
       sessionState.tabProfiles[String(tab.id)] = {
-        siteKey,
+        pageKey,
         profile: tabProfile,
       };
-      siteProfiles[siteKey] = tabProfile;
     }
 
     applications.push({ tabId: tab.id, profile: tabProfile });
   }
 
-  await Promise.all([
-    chrome.storage.local.set({ siteProfiles }),
-    chrome.storage.session.set({
-      tabProfiles: sessionState.tabProfiles,
-      uiState,
-    }),
-  ]);
+  sessionState.uiState = uiState;
+  sessionState.allTabsProfile = uiState.scope === "all" ? profile : null;
+  sessionState.appliedTabIds = nextAppliedTabIds;
+
+  await chrome.storage.session.set(sessionState);
+  await Promise.all(
+    removedTabIds.map((tabId) => sendToTab(
+      tabId,
+      settingsForContent(DEFAULT_PROFILE),
+    )),
+  );
   const results = await Promise.all(
     applications.map(async ({ tabId, profile: tabProfile }) => ({
       targeted: tabProfile.enabled,
@@ -381,12 +407,9 @@ async function applyPopupState(message) {
 
 chrome.runtime.onInstalled.addListener(() => {
   void (async () => {
-    const [siteProfiles, sessionState] = await Promise.all([
-      getSiteProfiles(),
-      getSessionState(),
-    ]);
+    const sessionState = await getSessionState();
     await Promise.all([
-      chrome.storage.local.set({ siteProfiles }),
+      chrome.storage.local.remove("siteProfiles"),
       chrome.storage.session.set(sessionState),
     ]);
   })();
@@ -403,14 +426,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   ) {
     void (async () => {
       try {
-        const [siteProfiles, sessionState] = await Promise.all([
-          getSiteProfiles(),
-          getSessionState(),
-        ]);
+        const sessionState = await getSessionState();
         const resolved = resolveProfile(
           sender.tab,
           sessionState.tabProfiles,
-          siteProfiles,
+          sessionState.uiState,
+          sessionState.allTabsProfile,
         );
         sendResponse({
           ok: true,
@@ -471,6 +492,9 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   void (async () => {
     const sessionState = await getSessionState();
     delete sessionState.tabProfiles[String(tabId)];
+    sessionState.appliedTabIds = sessionState.appliedTabIds.filter(
+      (appliedTabId) => appliedTabId !== tabId,
+    );
     sessionState.uiState.selectedTabIds =
       sessionState.uiState.selectedTabIds.filter((id) => id !== tabId);
     await chrome.storage.session.set(sessionState);

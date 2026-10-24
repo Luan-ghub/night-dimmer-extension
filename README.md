@@ -35,22 +35,24 @@ O recurso é reversível e oferece três intensidades: **Suave**, **Equilibrado*
 
 ### Aplicação por abas
 
-- **Somente nesta aba:** aplica na aba ativa no momento da configuração.
+- **Somente nesta aba:** aplica na página aberta na aba ativa. Uma nova aba ou outra página começa desligada.
 - **Abas selecionadas:** mostra as guias da janela atual com favicon, título,
   domínio, último acesso e controle individual de brilho.
-- **Todas as abas:** aplica em abas compatíveis de todas as janelas.
+- **Todas as abas:** aplica em abas compatíveis de todas as janelas, inclusive nas páginas abertas depois, enquanto esse modo estiver selecionado.
 
 A lista de abas pode ser expandida verticalmente arrastando sua borda inferior.
-Cada guia mantém sua própria configuração durante a sessão. As preferências também
-são salvas por site e reaplicadas quando ele é aberto novamente.
+Cada guia mantém sua configuração durante a sessão e ao recarregar a mesma página.
+As configurações não são recuperadas automaticamente ao abrir outra página do mesmo site.
+Ao reduzir o escopo ou retirar uma guia da seleção, as páginas que ficaram de fora
+voltam ao brilho original.
 
 ## Privacidade e permissões
 
-As configurações são armazenadas localmente pelo navegador. A extensão associa as
-preferências ao endereço de origem do site, sem salvar conteúdo das páginas. Ela não
-envia dados para serviços externos e não coleta o histórico de navegação.
+As configurações das abas ficam na sessão do navegador. A extensão não salva
+preferências por site nem conteúdo das páginas. Ela não envia dados para serviços
+externos e não coleta o histórico de navegação.
 
-- `storage`: salva as preferências de brilho e conforto visual;
+- `storage`: mantém as configurações das abas durante a sessão;
 - `tabs`: permite selecionar em quais abas os efeitos serão aplicados;
 - `scripting` e acesso às páginas: aplicam os efeitos nas abas escolhidas.
 
@@ -110,7 +112,7 @@ Obs:
 
 - configurações independentes para cada aba;
 - aplicação automática ao alternar ou recarregar guias;
-- recuperação das preferências salvas ao reabrir um site.
+- reaplicação da configuração ao recarregar a mesma página.
 
 ### Atualização 3.1.0
 
